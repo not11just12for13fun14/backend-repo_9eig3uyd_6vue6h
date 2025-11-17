@@ -1,8 +1,13 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
 
-app = FastAPI()
+from schemas import Lead
+from database import create_document
+
+app = FastAPI(title="Real Estate SaaS API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -63,6 +68,28 @@ def test_database():
     response["database_name"] = "✅ Set" if os.getenv("DATABASE_NAME") else "❌ Not Set"
     
     return response
+
+# -----------------------------
+# Lead capture endpoint
+# -----------------------------
+
+class LeadRequest(BaseModel):
+    name: str
+    email: str
+    phone: Optional[str] = None
+    message: Optional[str] = None
+    source: Optional[str] = "website"
+    property_interest: Optional[str] = None
+    budget: Optional[float] = None
+
+@app.post("/api/leads")
+def create_lead(lead: LeadRequest):
+    try:
+        lead_model = Lead(**lead.model_dump())
+        inserted_id = create_document("lead", lead_model)
+        return {"status": "ok", "id": inserted_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
